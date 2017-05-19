@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <string name="firebase_database_url" translatable="false">https://tap-duel.firebaseio.com</string>
+  <string name="gcm_defaultSenderId" translatable="false">637856971651</string>
+  <string name="google_storage_bucket" translatable="false">tap-duel.appspot.com</string>
+  <string name="project_id" translatable="false">tap-duel</string>
+  <string name="google_api_key" translatable="false">AIzaSyBUDJtNCryI_RQx4kQBiO7SXrUfWHjagOk</string>
+  <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBUDJtNCryI_RQx4kQBiO7SXrUfWHjagOk</string>
+  <string name="google_app_id" translatable="false">1:637856971651:android:4f0bd2cd3777649a</string>
+  <string name="default_web_client_id" translatable="false">637856971651-afq5anslfs36qe35jrsfd6d6mgf123n7.apps.googleusercontent.com</string>
+</resources>

@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "637856971651",
+    "firebase_url": "https://tap-duel.firebaseio.com",
+    "project_id": "tap-duel",
+    "storage_bucket": "tap-duel.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:637856971651:android:4f0bd2cd3777649a",
+        "android_client_info": {
+          "package_name": "com.mloud.tapper"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "637856971651-afq5anslfs36qe35jrsfd6d6mgf123n7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUDJtNCryI_RQx4kQBiO7SXrUfWHjagOk"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
