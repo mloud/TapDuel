@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
+
 
 
 namespace Data
@@ -12,6 +12,29 @@ namespace Data
 		public AiSettings AiSettings;
 		public List<AiSettings> AiSettingsDict;
 		public List<Level> Levels;
+	}
+
+	[Serializable]
+	public class Players
+	{
+		public List<PlayerRecord> PlayerList;
+	}
+
+	[Serializable]
+	public class PlayerRecord
+	{
+		public string Id;
+		public string Name;
+		public int FinishedMission;
+
+		public Dictionary<string, Object> ToDictionary() 
+		{
+			Dictionary<string, Object> result = new Dictionary<string, Object>();
+			result["Id"] = Id;
+			result["Name"] = Name;
+			result["FinishedMission"] = FinishedMission;
+			return result;
+		}
 	}
 
 	[Serializable]

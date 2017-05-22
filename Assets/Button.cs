@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
+using Vis;
 
 public class Button : MonoBehaviour
 {
@@ -19,10 +20,13 @@ public class Button : MonoBehaviour
 	void OnMouseUp () 
 	{
 		anim.SetTrigger("bump");
+		if (!Utils.IsPointerOverUI())
+			clickEvent.Invoke();
 	}
 
 	void Action()
 	{
-		clickEvent.Invoke();
+		
 	}
+
 }

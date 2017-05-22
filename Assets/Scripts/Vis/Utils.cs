@@ -2,6 +2,8 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using TMPro.Examples;
 
 namespace Vis
 {
@@ -16,6 +18,19 @@ namespace Vis
 			(tr as RectTransform).anchorMin = Vector3.zero;
 			(tr as RectTransform).offsetMin = Vector3.zero;
 			(tr as RectTransform).offsetMax = Vector3.zero;
+		}
+
+		public static bool IsPointerOverUI()
+		{
+			#if UNITY_EDITOR
+			return EventSystem.current.IsPointerOverGameObject();
+			#else
+			for (int i = 0; i < Input.touchCount; ++i) {
+				if (EventSystem.current.IsPointerOverGameObject(Input.touches[i].fingerId))
+					return true;
+			}
+			return false;
+			#endif
 		}
 
 		public static void SetAlpha(float alpha, GameObject go)

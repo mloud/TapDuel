@@ -2,6 +2,8 @@
 using System;
 using System.Collections;
 using Vis;
+using System.Collections.Generic;
+using Data;
 
 
 public class Menu : MonoBehaviour
@@ -14,6 +16,15 @@ public class Menu : MonoBehaviour
 
 	[SerializeField]
 	GameObject ingameUiPrefab;
+
+	[SerializeField]
+	GameObject inputNamePrefab;
+
+	[SerializeField]
+	GameObject lbPopupPrefab;
+
+	[SerializeField]
+	GameObject beatMePopupPrefab;
 
 
 	[SerializeField]
@@ -54,6 +65,17 @@ public class Menu : MonoBehaviour
 		popup.Init(title, text, action);
 	}
 
+	public void OpenInputTextPopup(string title, Action<string> action)
+	{
+		var popupGo = Instantiate(inputNamePrefab);	
+
+		popupGo.transform.SetParent(transform);
+		popupGo.transform.SetAsLastSibling();
+		popupGo.transform.localPosition = Vector3.zero;
+		var popup = popupGo.GetComponent<InputFieldPopup>();
+		popup.Init(title, action,null);
+	}
+
 	public void ShowInGameUi()
 	{
 		var ingameUi = Instantiate(ingameUiPrefab);	
@@ -80,6 +102,28 @@ public class Menu : MonoBehaviour
 		popupGo.transform.localPosition = Vector3.zero;
 		var popup = popupGo.GetComponent<QuestionPopup>();
 		popup.Init(title, text, actionYes, actionNo);
+	}
+
+	public void OpenLBPopup(List<PlayerRecord> lb)
+	{
+		var popupGo = Instantiate(lbPopupPrefab);	
+
+		popupGo.transform.SetParent(transform);
+		popupGo.transform.SetAsLastSibling();
+		popupGo.transform.localPosition = Vector3.zero;
+		var popup = popupGo.GetComponent<LBPopup>();
+		popup.Init(lb);
+	}
+
+	public void OpenBeatMePopup(List<BattleRecord> recs)
+	{
+		var popupGo = Instantiate(beatMePopupPrefab);	
+
+		popupGo.transform.SetParent(transform);
+		popupGo.transform.SetAsLastSibling();
+		popupGo.transform.localPosition = Vector3.zero;
+		var popup = popupGo.GetComponent<BeatMePopup>();
+		popup.Init(recs);
 	}
 }
 

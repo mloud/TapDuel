@@ -1,7 +1,8 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.IO;
+using Data;
 
 public class Boot : MonoBehaviour
 {
@@ -9,15 +10,22 @@ public class Boot : MonoBehaviour
 	void Start () 
 	{
 		StartCoroutine(Menu.Instance.SetIntroPanelActive(true));
-		StartCoroutine(LoadData());
+		StartCoroutine(StartBootSequence());
 	}
 	
-	IEnumerator LoadData()
+	IEnumerator StartBootSequence()
 	{
+		#if !UNITY_EDITOR
+		yield return StartCoroutine(Session.Instance.AuthorizeUser());
+		#endif
+		//string userId = Session.Instance.User.Id();
 		yield return StartCoroutine(Session.Instance.LoadGameData());
-		SceneManager.LoadScene(1, LoadSceneMode.Additive);
-		Menu.Instance.ShowInGameUi();
-		yield return StartCoroutine(Menu.Instance.SetIntroPanelActive(false));
 
+		bool profileFinished = false;
+		Session.Instance.User.LoadProfile(()=>profileFinished = true);
+		yield return new WaitUntil(()=>profileFinished);
+
+		SceneManager.LoadScene(1, LoadSceneMode.Additive);
+		yield return StartCoroutine(Menu.Instance.SetIntroPanelActive(false));
 	}
 }

@@ -11,6 +11,7 @@ namespace Txt
 		public static string STR_PRESS_AGAIN_EXIT = "STR_PRESS_AGAIN_EXIT";
 		public static string STR_ERROR = "ERROR";
 		public static string STR_RESET_THE_GAME = "STR_RESET_THE_GAME";
+		public static string STR_TYPE_NAME = "STR_TYPE_NAME";
 	}
 }
 

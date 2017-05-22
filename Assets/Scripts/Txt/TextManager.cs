@@ -46,7 +46,7 @@ namespace Txt
 			texts.Add(TextConts.STR_PRESS_AGAIN_LEAVE, "Press back key again to leave the battle");
 			texts.Add(TextConts.STR_ERROR, "Error");
 			texts.Add(TextConts.STR_RESET_THE_GAME, "Do you want to reset your progress?");
-
+			texts.Add(TextConts.STR_TYPE_NAME, "Type your name");
 		}
 	}
 }

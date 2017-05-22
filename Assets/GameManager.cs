@@ -7,9 +7,6 @@ using Txt;
 using System;
 using Data;
 
-
-
-
 public class GameManager : MonoBehaviour 
 {
 	[SerializeField]
@@ -34,13 +31,24 @@ public class GameManager : MonoBehaviour
 	Transform rightBonusContainer;
 
 	[SerializeField]
+	GameObject objectsContainer;
+
+	[SerializeField]
 	GameVisual visual;
 
+	[SerializeField]
 	List<Mover> leftMovers;
+
+	[SerializeField]
 	List<Mover> rightMovers;
 
+	[SerializeField]
 	Transform leftContainer;
+	[SerializeField]
 	Transform rightContainer;
+
+	[SerializeField]
+	GameObject center;
 
 	Mover leftMoverPrefab;
 	Mover rightMoverPrefab;
@@ -56,6 +64,14 @@ public class GameManager : MonoBehaviour
 
 	float linePosition;
 	float timeLeft;
+	float battleTime;
+
+	BattleMode battleMode;
+	BattleRecorder leftBattleRecorder;
+	BattleRecorder rightBattleRecorder;
+
+	BattlePlayer leftBattlePlayer;
+	public BattleRecord BattleRec;
 
 	#if UNITY_EDITOR
 	const KeyCode exitCode = KeyCode.Space;
@@ -77,12 +93,17 @@ public class GameManager : MonoBehaviour
 		yield break;
 	}
 
+	BattleRecorder GetBattleRecorder(Defs.Side side)
+	{
+		return side == Defs.Side.Left ? leftBattleRecorder : rightBattleRecorder;
+	}
+
 	BonusGenerator GetBonusGenerator(Defs.Side side)
 	{
 		return side == Defs.Side.Left ? leftBonusGen : rightBonusGen;
 	}
 
-	List<Mover> GetMovers(Defs.Side side) 
+	public List<Mover> GetMovers(Defs.Side side) 
 	{
 		return side == Defs.Side.Left ? leftMovers : rightMovers;
 	}
@@ -97,7 +118,7 @@ public class GameManager : MonoBehaviour
 		return side == Defs.Side.Left ? leftContainer : rightContainer;
 	}
 
-	Mover GetActualMoverShape(Defs.Side side)
+	public Mover GetActualMoverShape(Defs.Side side)
 	{
 		return side == Defs.Side.Left ? leftMoverPrefab : rightMoverPrefab;
 	}
@@ -111,7 +132,7 @@ public class GameManager : MonoBehaviour
 		}
 	}
 
-	Defs.Side GetOppositeSide(Defs.Side side)
+	public Defs.Side GetOppositeSide(Defs.Side side)
 	{
 		return side == Defs.Side.Left ? Defs.Side.Right : Defs.Side.Left;
 	}
@@ -125,9 +146,9 @@ public class GameManager : MonoBehaviour
 		Application.targetFrameRate = 30;
 
 
-		var movers = GameObject.FindObjectsOfType<Mover>().ToList();
-		leftMovers = movers.FindAll(x=>x.side == Mover.Side.Left);
-		rightMovers = movers.FindAll(x=>x.side == Mover.Side.Right);
+		//var movers = GameObject.FindObjectsOfType<Mover>().ToList();
+		//leftMovers = movers.FindAll(x=>x.side == Mover.Side.Left);
+		//rightMovers = movers.FindAll(x=>x.side == Mover.Side.Right);
 
 		leftBonusGen.Action = OnBonusPicked;
 		leftBonusGen.BonusOutOfScreenAction = BonusOutOfScreen;
@@ -135,12 +156,8 @@ public class GameManager : MonoBehaviour
 		rightBonusGen.Action = OnBonusPicked;
 		rightBonusGen.BonusOutOfScreenAction = BonusOutOfScreen;
 
-		leftContainer = GameObject.Find("LeftContainer").transform;
-		rightContainer = GameObject.Find("RightContainer").transform;
-
 		ui.SetTimerActive(false, false);
 		ui.bar.Hide();
-
 
 		StartCoroutine(InitCoroutine());
 	}
@@ -154,6 +171,8 @@ public class GameManager : MonoBehaviour
 	{
 		if (running) {
 			timeLeft -= Time.deltaTime;
+			battleTime += Time.deltaTime;
+		
 			ui.SetTimer(timeLeft);
 			if (timeLeft < 0) {
 				ResolveBattleEnd();
@@ -164,6 +183,9 @@ public class GameManager : MonoBehaviour
 				ResolveBattleEnd(1);
 			} else if (Input.GetKeyDown(KeyCode.Q)) {
 				ResolveBattleEnd(-1);
+			}
+			if (battleMode == BattleMode.BeatMe) {
+				leftBattlePlayer.Update(battleTime);
 			}
 		} 
 
@@ -176,7 +198,7 @@ public class GameManager : MonoBehaviour
 		UpdateKeyPressChecks ();
 	}
 
-	void SwapMovers(Defs.Side side)
+	public void SwapMovers(Defs.Side side)
 	{
 		var pos = new List<Vector3>();
 		var movers = GetMovers(side);
@@ -209,7 +231,7 @@ public class GameManager : MonoBehaviour
 	}
 
 
-	void OnTouch(Vector3 pos, Defs.Side side)
+	public void OnTouch(Vector3 pos, Defs.Side side)
 	{
 		if (!running)
 			return;
@@ -219,13 +241,17 @@ public class GameManager : MonoBehaviour
 			float step = 0;
 			if (mover.type == GetActualMoverShape(side).type) {
 				mover.PlayCorrectTap();
+				GetBattleRecorder(side).AddEvent(BattleEventType.OkTap, battleTime);
 				step = (int)side * -1 * World.BattleConfig.PositiveMove;
 			} else {
 				mover.PlayWrongTap();
+				GetBattleRecorder(side).AddEvent(BattleEventType.WrongTap, battleTime);
 				step = (int)side * World.BattleConfig.NegativeMove;
 			}
 			GenerateMoverShape(side);
-			MoveLineByStep(step);
+
+			if (battleMode != BattleMode.BeatMeRecording)
+				MoveLineByStep(step);
 		}
 
 		var bonuses = GameObject.FindObjectsOfType<BonusBase>().ToList();
@@ -301,35 +327,44 @@ public class GameManager : MonoBehaviour
 			ShapeChanged(side);
 	}
 
-
 	void ResolveBattleEnd(int forcedWinSide = 0)
 	{
 		if (running) {
 			audio.Stop();
 
-			Defs.Side winningSide = visual.GetLinePosition() < 0 ?
-				Defs.Side.Right :Defs.Side.Left;
 
-			if (forcedWinSide != 0)
-				winningSide = forcedWinSide == -1 ? Defs.Side.Left : Defs.Side.Right;
+			if (battleMode == BattleMode.BeatMeRecording) {
+				Menu.Instance.OpenInputTextPopup("Type name of your beat me battle",(str)=>{
+					var rec = new BattleRecord()	;
+					rec.Events = GetBattleRecorder(Defs.Side.Right).Events;
+					rec.Name = str;
+					rec.Id = GetBattleRecorder(Defs.Side.Right).ToString();
+					rec.UserId = Session.Instance.User.Id();
+					rec.UserName = Session.Instance.User.Name();
+					Session.Instance.Actions.CreateBeatMe(rec);
+				});
+			} else {
+				Defs.Side winningSide = visual.GetLinePosition() < 0 ?
+					Defs.Side.Right :Defs.Side.Left;
 
-			// Right player won
-			if (winningSide == Defs.Side.Right)
-				ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_RIGHT_PLAYER_WON), true);
-			// Left Player won
-			else
-				ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_LEFT_PLAYER_WON), true);
-			running = false;
+				if (forcedWinSide != 0)
+					winningSide = forcedWinSide == -1 ? Defs.Side.Left : Defs.Side.Right;
 
+				// Right player won
+				if (winningSide == Defs.Side.Right)
+					ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_RIGHT_PLAYER_WON), true);
+				// Left Player won
+				else
+					ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_LEFT_PLAYER_WON), true);
 
-
-
-			if (ai != null && winningSide == GetPlayerSide()) {
-				ProgressManager.Instance.SaveLastFinishedMission(missionId);
+				if (battleMode == BattleMode.Solo && winningSide == GetPlayerSide()) {
+					ProgressManager.Instance.SaveLastFinishedMission(missionId);
+					Session.Instance.User.Profile.FinishedMission = missionId;
+					Session.Instance.Actions.UpdateUser();
+				}
 			}
-			Menu.Instance.ShowInGameUi();
 
-
+			running = false;
 			Invoke("Wait", 2.0f);
 		}
 		ui.SetTimerActive(false);
@@ -350,14 +385,31 @@ public class GameManager : MonoBehaviour
 
 	public void NewGame()
 	{
-		Menu.Instance.HideIngameUi();
-		ui.SetPlayButtonActive(false);
+		battleMode = BattleMode.Duel;
+		ui.SetToBattleGameMode();
 		StartCoroutine(CountDownCoroutine());
 	}
 
+	public void NewBeatMeGameRecording()
+	{
+		battleMode = BattleMode.BeatMeRecording;
+		ui.SetToBattleGameMode();
+		StartCoroutine(CountDownCoroutine());
+	}
+
+	public void NewBeatMePlay()
+	{
+		battleMode = BattleMode.BeatMe;
+		ui.SetToBattleGameMode();
+		StartCoroutine(CountDownCoroutine());
+	}
+
+
 	public void NewAiGame()
 	{
-		Menu.Instance.HideIngameUi();
+		battleMode = BattleMode.Solo;
+		ui.SetToBattleGameMode();
+
 		int lastFinishedMission = ProgressManager.Instance.GetLastFinishedMission();
 		int nextMission = Mathf.Min(lastFinishedMission + 1, Session.Instance.Data.Utils.GetMissionsCount() - 1);
 		AiSettings aiSettings = Session.Instance.Data.Utils.GetAiSettings(nextMission);
@@ -367,12 +419,16 @@ public class GameManager : MonoBehaviour
 		ai = new GameObject("Ai").AddComponent<Ai>();
 		ai.Set(new AiContext(GetMovers, GetActualMoverShape, Defs.Side.Left, OnTouch, aiSettings));
 		ShapeChanged += ai.OnShapeChanged;
-		ui.SetPlayButtonActive(false);
-			StartCoroutine(CountDownCoroutine());
+		StartCoroutine(CountDownCoroutine());
 	}
 
 	IEnumerator CountDownCoroutine()
 	{
+		objectsContainer.SetActive(true);
+		leftMovers.ForEach(x=>x.PlayOut());
+		rightMovers.ForEach(x=>x.PlayOut());
+
+
 		starting = true;
 		ui.ShowMessage(3.ToString());
 		yield return new WaitForSeconds(0.5f);
@@ -380,7 +436,6 @@ public class GameManager : MonoBehaviour
 		yield return new WaitForSeconds(0.5f);
 		ui.ShowMessage(1.ToString());
 		yield return new WaitForSeconds(0.5f);
-		ui.ShowMessage("Hraj");
 		ui.ShowMessage(0.5f.ToString());
 
 		ui.HideMessage();
@@ -396,11 +451,18 @@ public class GameManager : MonoBehaviour
 		GenerateMoverShape(Defs.Side.Left);
 		GenerateMoverShape(Defs.Side.Right);
 
+		if (battleMode == BattleMode.BeatMe) {
+			leftBattlePlayer = new BattlePlayer( BattleRec,this, Defs.Side.Left);
+			leftBattlePlayer.Start();
+		}
 
 		ui.SetTimerActive(true);
 		audio.Play();
 		running = true;
 		starting = false;
+		battleTime = 0;
+		leftBattleRecorder = new BattleRecorder();
+		rightBattleRecorder = new BattleRecorder();
 	}
 
 	float GetLeftSidePosition()
@@ -420,24 +482,27 @@ public class GameManager : MonoBehaviour
 		}
 	}
 
-	void LooseBonusRow(Defs.Side side)
+	public void LooseBonusRow(Defs.Side side)
 	{
 		var container = GetBonusContainer(side);
 		for(int i = 0; i < container.childCount; ++i) {
 			Destroy(container.GetChild(i).gameObject);
 		}
+		GetBattleRecorder(side).AddEvent(BattleEventType.NumbersLost, battleTime);
 	}
 
 	void OnBonusPicked(BonusBase bonusBase)
 	{
 		if (bonusBase is BonusShuffle) {
 			SwapMovers(GetOppositeSide(bonusBase.Side));
+			GetBattleRecorder(bonusBase.Side).AddEvent(BattleEventType.Shuffle, battleTime);
 		} else if (bonusBase is BonusNumber) {
 			Transform bonusContainer = GetBonusContainer(bonusBase.Side);
 			if (bonusBase.Falling) {
 				var pos = bonusContainer.position - (int)bonusBase.Side * bonusContainer.childCount * new Vector3(1.05f, 0,0);
 				bonusBase.transform.SetParent(bonusContainer);
 				bonusBase.transform.position = pos;
+				GetBattleRecorder(bonusBase.Side).AddEvent(BattleEventType.NumberTapped, battleTime);
 			} else {
 				StartCoroutine(PickNumberBonus(bonusContainer, GetBonusGenerator(bonusBase.Side), bonusBase.Side));
 			}
@@ -446,6 +511,7 @@ public class GameManager : MonoBehaviour
 		
 	IEnumerator PickNumberBonus(Transform container, BonusGenerator generator, Defs.Side side)
 	{
+		GetBattleRecorder(side).AddEvent(BattleEventType.NumbersFired, battleTime);
 		MoveLineByStep(-(int)side * World.BattleConfig.PositiveMove *  World.BattleConfig.NumberCoef[container.childCount - 1]);
 		generator.ResetNumber();
 		while (container.childCount > 0) {
@@ -469,5 +535,46 @@ public class GameManager : MonoBehaviour
 				}
 			}));
 		}
+	}
+
+	public void OnReset()
+	{
+		Menu.Instance.OpenQuestionPopup ("", TextManager.Instance.Get (TextConts.STR_RESET_THE_GAME), 
+			// yes
+			()=> {
+				ProgressManager.Instance.ResetProgress();
+				App.Restart();
+			},
+			//no
+			() => {}
+		);
+	}
+
+	public void OnConnect()
+	{
+		Menu.Instance.OpenInputTextPopup (
+			TextManager.Instance.Get (TextConts.STR_TYPE_NAME), (str)=> {
+				Session.Instance.User.SetName(str, (result)=> {
+					ui.Refresh();
+				});
+			});
+	}
+
+	public void OnLbs()
+	{
+		ActivityIndicator.Show();
+		Session.Instance.Actions.GetLeaderboards((lb)=>{
+			Menu.Instance.OpenLBPopup(lb);
+			ActivityIndicator.Hide();
+		});
+	}
+
+	public void OnBeatMe()
+	{
+		ActivityIndicator.Show();
+		Session.Instance.Actions.GetBeatMe((recs)=>{
+			Menu.Instance.OpenBeatMePopup(recs);
+			ActivityIndicator.Hide();
+		});
 	}
 }
