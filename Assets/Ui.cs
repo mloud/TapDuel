@@ -111,13 +111,13 @@ public class Ui : MonoBehaviour
 	{
 		if (useAnim) {
 			if (active) {
-				timer.gameObject.SetActive(true);
-				timer.gameObject.GetComponent<Animator>().SetTrigger("out");
+				timer.transform.parent.gameObject.SetActive(true);
+				timer.transform.parent.gameObject.GetComponent<Animator>().SetTrigger("out");
 			} else {
-				timer.gameObject.GetComponent<Animator>().SetTrigger("in");
+				timer.transform.parent.gameObject.GetComponent<Animator>().SetTrigger("in");
 			}
 		} else {
-			timer.gameObject.SetActive(active);
+			timer.transform.parent.gameObject.SetActive(active);
 		}
 	}
 

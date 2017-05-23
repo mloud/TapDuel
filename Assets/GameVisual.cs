@@ -11,6 +11,7 @@ public class GameVisual : MonoBehaviour
 	[SerializeField]
 	Transform rightLine;
 
+
 	public void MoveLine(float x)
 	{
 		lineController.Move(x);
@@ -34,5 +35,7 @@ public class GameVisual : MonoBehaviour
 	public void PlayLineAppear()
 	{
 		lineController.PlayAppear();
+		leftLine.gameObject.SetActive(true);
+		rightLine.gameObject.SetActive(true);
 	}
 }

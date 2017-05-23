@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections;
@@ -140,9 +139,9 @@ public class GameManager : MonoBehaviour
 	void Awake()
 	{ 
 		// 5.14 - 5.7
-		if (Camera.main.aspect >= 4.0f/3.0f) {
-			Camera.main.orthographicSize = 5.7f;
-		}
+//		if (Camera.main.aspect >= 4.0f/3.0f) {
+//			Camera.main.orthographicSize = 5.7f;
+//		}
 		Application.targetFrameRate = 30;
 
 
@@ -319,7 +318,7 @@ public class GameManager : MonoBehaviour
 		moverShape.transform.SetParent(GetShapeContainer(side));
 		moverShape.transform.localPosition = Vector3.zero;
 		moverShape.PlayOut();
-		moverShape.SetColor(Color.black);
+		//moverShape.SetColor(Color.black);
 
 		SetActualMoverShape(moverShape, side);
 
