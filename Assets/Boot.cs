@@ -15,7 +15,7 @@ public class Boot : MonoBehaviour
 	
 	IEnumerator StartBootSequence()
 	{
-		#if !UNITY_EDITOR
+		#if UNITY_ANDROID && !UNITY_EDITOR
 		yield return StartCoroutine(Session.Instance.AuthorizeUser());
 		#endif
 		//string userId = Session.Instance.User.Id();

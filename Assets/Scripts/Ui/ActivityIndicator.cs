@@ -14,7 +14,9 @@ public static class ActivityIndicator
 	}
 	public static void Hide()
 	{
+		#if UNITY_IPHONE || UNITY_ANDROID
 		Handheld.StopActivityIndicator();
+		#endif
 	}
 }
 

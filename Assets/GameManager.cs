@@ -5,8 +5,10 @@ using System.Collections;
 using Txt;
 using System;
 using Data;
+using UnityEngine.SceneManagement;
 
-public class GameManager : MonoBehaviour 
+
+public class GameManager : MonoBehaviour, IGameManager
 {
 	[SerializeField]
 	AudioSource audio;
@@ -14,8 +16,16 @@ public class GameManager : MonoBehaviour
 	[SerializeField]
 	Ui ui;
 
+	public Action RightTouchAction { get; set; }
+	public Action WrongTouchAction { get; set; }
+	public Action<string> BonusCollectedAction { get; set; }
+	public Action<float> NumberBonusFiredAction { get; set; }
+
+
+	public List<InputManager> InputManagers { get; set; }
+
 	[SerializeField]
-	InputManager inputManager;
+	InputManager inputManagerPrefab;
 
 	[SerializeField]
 	BonusGenerator leftBonusGen;
@@ -52,6 +62,9 @@ public class GameManager : MonoBehaviour
 	Mover leftMoverPrefab;
 	Mover rightMoverPrefab;
 
+	public bool IsRunning { get { return running; } }
+	public float BattleTime { get { return battleTime; } }
+
 	World World { get { return Session.Instance.Data.World; }}
 
 	Ai ai;
@@ -69,14 +82,7 @@ public class GameManager : MonoBehaviour
 	BattleRecorder leftBattleRecorder;
 	BattleRecorder rightBattleRecorder;
 
-	BattlePlayer leftBattlePlayer;
 	public BattleRecord BattleRec;
-
-	#if UNITY_EDITOR
-	const KeyCode exitCode = KeyCode.Space;
-	#else
-	const KeyCode exitCode = KeyCode.Escape;
-	#endif
 
 	int missionId = -1;
 
@@ -131,23 +137,9 @@ public class GameManager : MonoBehaviour
 		}
 	}
 
-	public Defs.Side GetOppositeSide(Defs.Side side)
-	{
-		return side == Defs.Side.Left ? Defs.Side.Right : Defs.Side.Left;
-	}
-
 	void Awake()
 	{ 
-		// 5.14 - 5.7
-//		if (Camera.main.aspect >= 4.0f/3.0f) {
-//			Camera.main.orthographicSize = 5.7f;
-//		}
 		Application.targetFrameRate = 30;
-
-
-		//var movers = GameObject.FindObjectsOfType<Mover>().ToList();
-		//leftMovers = movers.FindAll(x=>x.side == Mover.Side.Left);
-		//rightMovers = movers.FindAll(x=>x.side == Mover.Side.Right);
 
 		leftBonusGen.Action = OnBonusPicked;
 		leftBonusGen.BonusOutOfScreenAction = BonusOutOfScreen;
@@ -158,14 +150,12 @@ public class GameManager : MonoBehaviour
 		ui.SetTimerActive(false, false);
 		ui.bar.Hide();
 
+		gameObject.AddComponent<MultiplayerComponent>();
+
 		StartCoroutine(InitCoroutine());
 	}
 
-	void Start () 
-	{
-		inputManager.TouchAction = OnTouch;
-	}
-	
+
 	void Update () 
 	{
 		if (running) {
@@ -183,9 +173,6 @@ public class GameManager : MonoBehaviour
 			} else if (Input.GetKeyDown(KeyCode.Q)) {
 				ResolveBattleEnd(-1);
 			}
-			if (battleMode == BattleMode.BeatMe) {
-				leftBattlePlayer.Update(battleTime);
-			}
 		} 
 
 		leftBonusGen.Running = running;
@@ -194,7 +181,6 @@ public class GameManager : MonoBehaviour
 		if (!starting && running) {
 			ui.bar.Set(GetHPCoef());
 		}
-		UpdateKeyPressChecks ();
 	}
 
 	public void SwapMovers(Defs.Side side)
@@ -208,27 +194,74 @@ public class GameManager : MonoBehaviour
 		}
 	}
 
-
-	bool keyPressCheckRunning;
-	IEnumerator CheckForKeyPress(KeyCode code, float time, Action action) 
-	{	
-		keyPressCheckRunning = true;
-		float startTime = Time.time;
-		yield return 0;
-		while ( (Time.time - startTime) < time) {
-			if (Input.GetKeyDown(code)) {
-				action();
-			}
-			yield return 0;
-		}
-		keyPressCheckRunning = false;
-	}
-
 	void OnTouch(Transform tr, Defs.Side side)
 	{
 		OnTouch(tr.position, side);
 	}
 
+	public void PerformRightTouch (Defs.Side side)
+	{
+		var movers = GetMovers(side);
+		var prefab = GetActualMoverShape(side);
+		var okMover = movers.Find(x=>x.type == prefab.type);
+		ApplyRightTouch(side, okMover);
+	}
+
+
+	public void PerformWrongTouch (Defs.Side side)
+	{
+		var movers = GetMovers(side);
+		var prefab = GetActualMoverShape(side);
+
+		var wrongMovers = movers.FindAll(x=>x.type != prefab.type);
+		var wrongMover = wrongMovers[UnityEngine.Random.Range(0, wrongMovers.Count)];
+		ApplyWrongTouch(side, wrongMover);
+	}
+
+	public void PerformCollectBonus(Defs.Side side, string name) 
+	{
+		if (name.Equals("Shuffle")) {
+			SwapMovers(GameUtils.GetOppositeSide(side));
+		}
+	}
+
+	public void PerformNumberBonusFired(Defs.Side side, float move)
+	{
+		MoveLineByStep(-(int)side * move);
+	}
+
+
+	public void CollectBonus(BonusBase BonusBase, Defs.Side side) 
+	{
+		var numbers = GameObject.FindObjectsOfType<BonusNumber>().ToList();
+		numbers.RemoveAll(x=>x.Side != side);
+		if (numbers.Count > 0) {
+			numbers[0].Collect();
+		} else {
+			Debug.LogError("CollectBonus but no bonus found");
+		}
+	}
+
+
+	void ApplyRightTouch(Defs.Side side, Mover mover)
+	{
+		mover.PlayCorrectTap();
+		float step = (int)side * -1 * World.BattleConfig.PositiveMove;
+		GenerateMoverShape(side);
+
+		if (battleMode != BattleMode.BeatMeRecording)
+			MoveLineByStep(step);
+	}
+
+	void ApplyWrongTouch(Defs.Side side, Mover mover)
+	{
+		mover.PlayWrongTap();
+		float step = (int)side * World.BattleConfig.NegativeMove;
+		GenerateMoverShape(side);
+
+		if (battleMode != BattleMode.BeatMeRecording)
+			MoveLineByStep(step);
+	}
 
 	public void OnTouch(Vector3 pos, Defs.Side side)
 	{
@@ -237,32 +270,33 @@ public class GameManager : MonoBehaviour
 
 		var mover = GetMovers(side).Find(x=>x.IsInside(pos));
 		if (mover != null) {
-			float step = 0;
 			if (mover.type == GetActualMoverShape(side).type) {
-				mover.PlayCorrectTap();
 				GetBattleRecorder(side).AddEvent(BattleEventType.OkTap, battleTime);
-				step = (int)side * -1 * World.BattleConfig.PositiveMove;
+				ApplyRightTouch(side, mover);
+				if (RightTouchAction != null)
+					RightTouchAction();
 			} else {
 				mover.PlayWrongTap();
 				GetBattleRecorder(side).AddEvent(BattleEventType.WrongTap, battleTime);
-				step = (int)side * World.BattleConfig.NegativeMove;
+				ApplyWrongTouch(side, mover);
+				if (WrongTouchAction != null)
+					WrongTouchAction();
 			}
-			GenerateMoverShape(side);
-
-			if (battleMode != BattleMode.BeatMeRecording)
-				MoveLineByStep(step);
 		}
 
 		var bonuses = GameObject.FindObjectsOfType<BonusBase>().ToList();
-		bonuses.ForEach(b=> {
-			if (b.Side == side) {
-				if (b.IsInside(pos)) {
-					b.Collect();
+		bonuses.ForEach(bonus=> {
+			if (bonus.Side == side) {
+				if (bonus.IsInside(pos)) {
+					bonus.Collect();
+					if (BonusCollectedAction != null)
+						BonusCollectedAction(bonus.Name);
 				}
 			}
 		});
 
 	}
+
 
 	void MoveLineByStep(float step)
 	{
@@ -371,10 +405,7 @@ public class GameManager : MonoBehaviour
 
 	Defs.Side GetPlayerSide()
 	{
-		if (ai != null){
-			return GetOppositeSide(ai.Side);
-		}
-		return Defs.Side.Right;
+		return ai != null ? GameUtils.GetOppositeSide (ai.Side) : Defs.Side.Right;
 	}
 
 	void Wait()
@@ -384,6 +415,12 @@ public class GameManager : MonoBehaviour
 
 	public void NewGame()
 	{
+		InputManagers =  new List<InputManager> { 
+			CreateInputManager(Defs.Side.Right),
+			CreateInputManager(Defs.Side.Left)
+		};
+
+
 		battleMode = BattleMode.Duel;
 		ui.SetToBattleGameMode();
 		StartCoroutine(CountDownCoroutine());
@@ -391,6 +428,7 @@ public class GameManager : MonoBehaviour
 
 	public void NewBeatMeGameRecording()
 	{
+		InputManagers =  new List<InputManager> { CreateInputManager(Defs.Side.Right) };
 		battleMode = BattleMode.BeatMeRecording;
 		ui.SetToBattleGameMode();
 		StartCoroutine(CountDownCoroutine());
@@ -398,7 +436,16 @@ public class GameManager : MonoBehaviour
 
 	public void NewBeatMePlay()
 	{
+		InputManagers =  new List<InputManager> { CreateInputManager(Defs.Side.Right) };
 		battleMode = BattleMode.BeatMe;
+		ui.SetToBattleGameMode();
+		gameObject.AddComponent<BeatMeComponent>().Set(BattleRec);
+		StartCoroutine(CountDownCoroutine());
+	}
+
+	public void NewMultiGame()
+	{
+		battleMode = BattleMode.Multiplayer;
 		ui.SetToBattleGameMode();
 		StartCoroutine(CountDownCoroutine());
 	}
@@ -406,6 +453,7 @@ public class GameManager : MonoBehaviour
 
 	public void NewAiGame()
 	{
+		InputManagers =  new List<InputManager> { CreateInputManager(Defs.Side.Right) };
 		battleMode = BattleMode.Solo;
 		ui.SetToBattleGameMode();
 
@@ -450,10 +498,6 @@ public class GameManager : MonoBehaviour
 		GenerateMoverShape(Defs.Side.Left);
 		GenerateMoverShape(Defs.Side.Right);
 
-		if (battleMode == BattleMode.BeatMe) {
-			leftBattlePlayer = new BattlePlayer( BattleRec,this, Defs.Side.Left);
-			leftBattlePlayer.Start();
-		}
 
 		ui.SetTimerActive(true);
 		audio.Play();
@@ -493,7 +537,7 @@ public class GameManager : MonoBehaviour
 	void OnBonusPicked(BonusBase bonusBase)
 	{
 		if (bonusBase is BonusShuffle) {
-			SwapMovers(GetOppositeSide(bonusBase.Side));
+			SwapMovers(GameUtils.GetOppositeSide(bonusBase.Side));
 			GetBattleRecorder(bonusBase.Side).AddEvent(BattleEventType.Shuffle, battleTime);
 		} else if (bonusBase is BonusNumber) {
 			Transform bonusContainer = GetBonusContainer(bonusBase.Side);
@@ -511,7 +555,13 @@ public class GameManager : MonoBehaviour
 	IEnumerator PickNumberBonus(Transform container, BonusGenerator generator, Defs.Side side)
 	{
 		GetBattleRecorder(side).AddEvent(BattleEventType.NumbersFired, battleTime);
-		MoveLineByStep(-(int)side * World.BattleConfig.PositiveMove *  World.BattleConfig.NumberCoef[container.childCount - 1]);
+		float distance = World.BattleConfig.PositiveMove *  World.BattleConfig.NumberCoef[container.childCount - 1];
+		MoveLineByStep(-(int)side * distance);
+
+		if (NumberBonusFiredAction != null) {
+			NumberBonusFiredAction(distance);
+		}
+
 		generator.ResetNumber();
 		while (container.childCount > 0) {
 			var bonus = container.GetChild(0).GetComponent<BonusNumber>();
@@ -521,20 +571,15 @@ public class GameManager : MonoBehaviour
 		}
 	}
 
-	void UpdateKeyPressChecks ()
+	InputManager CreateInputManager(Defs.Side side)
 	{
-		if (!keyPressCheckRunning && Input.GetKeyDown (exitCode)) {
-			ui.BottomPopup.Open (TextManager.Instance.Get (running ? TextConts.STR_PRESS_AGAIN_LEAVE : TextConts.STR_PRESS_AGAIN_EXIT), 2.0f);
-			StartCoroutine (CheckForKeyPress (exitCode, 2.0f, () =>  {
-				if (running) {
-					App.Restart ();
-				}
-				else {
-					Application.Quit ();
-				}
-			}));
-		}
+		var inputManager = Instantiate(inputManagerPrefab.gameObject).GetComponent<InputManager>();
+		inputManager.Side = side;
+		inputManager.UsedInMultiplayer = false;
+		return inputManager;
 	}
+
+
 
 	public void OnReset()
 	{
@@ -575,5 +620,10 @@ public class GameManager : MonoBehaviour
 			Menu.Instance.OpenBeatMePopup(recs);
 			ActivityIndicator.Hide();
 		});
+	}
+
+	public void OnLobby()
+	{
+		SceneManager.LoadScene("Lobby");
 	}
 }

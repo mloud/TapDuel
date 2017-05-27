@@ -1,35 +1,32 @@
-﻿using System.Collections.Generic;
-using Data;
+﻿using Data;
 using UnityEngine;
-using System.Linq;
 
-
-public class BattlePlayer
+public class BattlePlayer : MonoBehaviour
 {
 	BattleRecord recs;
-	bool running;
 	Defs.Side side;
-	GameManager gameManager;
+	IGameManager gameManager;
 
-	public BattlePlayer(BattleRecord recs, GameManager gameManager, Defs.Side side)
+	public void Set(BattleRecord recs, IGameManager gameManager, Defs.Side side)
 	{
 		this.recs = recs;
 		this.gameManager = gameManager;
 		this.side = side;
 	}
 
-	public void Start()
+	public void Set(IGameManager gameManager, Defs.Side side)
 	{
-		running = true;
+		this.gameManager = gameManager;
+		this.side = side;
 	}
 
 
-	public void Update(float battleTime)
+	void Update()
 	{
-		if (running) {
+		if (recs != null && gameManager.IsRunning) {
 			for (int i = 0; i < recs.Events.Count; ++i) {
 				var ev = recs.Events[i];
-				if (battleTime > ev.Time) {
+				if (gameManager.BattleTime > ev.Time) {
 					PerformEvent(ev);
 					recs.Events.RemoveAt(i);
 					break;
@@ -38,30 +35,18 @@ public class BattlePlayer
 		}
 	}
 
-	void PerformEvent(BattleEvent ev)
+	public void PerformEvent(BattleEvent ev)
 	{
 		if (ev.Type == BattleEventType.OkTap) {
-			var movers = gameManager.GetMovers(side);
-			var prefab = gameManager.GetActualMoverShape(side);
-
-			var okMover = movers.Find(x=>x.type == prefab.type);
-			gameManager.OnTouch(okMover.transform.position, side);
+			gameManager.PerformRightTouch(side);
 		}else if (ev.Type == BattleEventType.WrongTap) {
-			var movers = gameManager.GetMovers(side);
-			var prefab = gameManager.GetActualMoverShape(side);
-
-			var wrongMover = movers.Find(x=>x.type != prefab.type);
-			gameManager.OnTouch(wrongMover.transform.position, side);
+			gameManager.PerformWrongTouch(side);
 		} else if (ev.Type == BattleEventType.Shuffle) {
-			gameManager.SwapMovers(gameManager.GetOppositeSide(side));			
+			gameManager.SwapMovers(GameUtils.GetOppositeSide(side));			
 		} else if (ev.Type == BattleEventType.NumbersLost) {
 			gameManager.LooseBonusRow(side);	
 		} else if (ev.Type == BattleEventType.NumberTapped) {
-			var numbers = GameObject.FindObjectsOfType<BonusNumber>().ToList();
-			numbers.RemoveAll(x=>x.Side != side);
-			if (numbers.Count > 0) {
-				numbers[0].Collect();
-			}
+			
 		} else if (ev.Type == BattleEventType.NumbersFired) {
 			
 		}

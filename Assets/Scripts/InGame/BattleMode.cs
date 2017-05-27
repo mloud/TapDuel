@@ -4,6 +4,7 @@ public enum BattleMode
 	Solo,
 	Duel,
 	BeatMeRecording,
-	BeatMe
+	BeatMe,
+	Multiplayer
 }
 
