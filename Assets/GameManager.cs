@@ -5,10 +5,11 @@ using System.Collections;
 using Txt;
 using System;
 using Data;
-using UnityEngine.SceneManagement;
+using UnityEngine.Networking.Match;
+using Inv;
 
 
-public class GameManager : MonoBehaviour, IGameManager
+public partial class GameManager : MonoBehaviour, IGameManager
 {
 	[SerializeField]
 	AudioSource audio;
@@ -23,6 +24,9 @@ public class GameManager : MonoBehaviour, IGameManager
 
 
 	public List<InputManager> InputManagers { get; set; }
+
+	[SerializeField]
+	MyNetworkManager networkManager;
 
 	[SerializeField]
 	InputManager inputManagerPrefab;
@@ -86,6 +90,8 @@ public class GameManager : MonoBehaviour, IGameManager
 
 	int missionId = -1;
 
+
+
 	IEnumerator InitCoroutine()
 	{
 		timeLeft = World.BattleConfig.BattleDuration;
@@ -98,35 +104,7 @@ public class GameManager : MonoBehaviour, IGameManager
 		yield break;
 	}
 
-	BattleRecorder GetBattleRecorder(Defs.Side side)
-	{
-		return side == Defs.Side.Left ? leftBattleRecorder : rightBattleRecorder;
-	}
 
-	BonusGenerator GetBonusGenerator(Defs.Side side)
-	{
-		return side == Defs.Side.Left ? leftBonusGen : rightBonusGen;
-	}
-
-	public List<Mover> GetMovers(Defs.Side side) 
-	{
-		return side == Defs.Side.Left ? leftMovers : rightMovers;
-	}
-
-	Transform GetBonusContainer(Defs.Side side) 
-	{
-		return side == Defs.Side.Left ? leftBonusContainer : rightBonusContainer;
-	}
-
-	Transform GetShapeContainer(Defs.Side side) 
-	{
-		return side == Defs.Side.Left ? leftContainer : rightContainer;
-	}
-
-	public Mover GetActualMoverShape(Defs.Side side)
-	{
-		return side == Defs.Side.Left ? leftMoverPrefab : rightMoverPrefab;
-	}
 
 	void SetActualMoverShape(Mover mover, Defs.Side side)
 	{
@@ -159,19 +137,25 @@ public class GameManager : MonoBehaviour, IGameManager
 	void Update () 
 	{
 		if (running) {
-			timeLeft -= Time.deltaTime;
-			battleTime += Time.deltaTime;
+
+			if (battleMode == BattleMode.Multiplayer) {
+				timeLeft -= Time.unscaledDeltaTime;
+				battleTime += Time.unscaledDeltaTime;
+			} else {
+				timeLeft -= Time.deltaTime;
+				battleTime += Time.deltaTime;
+			}
 		
 			ui.SetTimer(timeLeft);
 			if (timeLeft < 0) {
-				ResolveBattleEnd();
+				BattleEnd();
 				running = false;
 			}
 
 			if (Input.GetKeyDown(KeyCode.W)) {
-				ResolveBattleEnd(1);
+				BattleEnd(1);
 			} else if (Input.GetKeyDown(KeyCode.Q)) {
-				ResolveBattleEnd(-1);
+				BattleEnd(-1);
 			}
 		} 
 
@@ -201,6 +185,7 @@ public class GameManager : MonoBehaviour, IGameManager
 
 	public void PerformRightTouch (Defs.Side side)
 	{
+		Debug.Log("PerformRightTouch " + side.ToString());
 		var movers = GetMovers(side);
 		var prefab = GetActualMoverShape(side);
 		var okMover = movers.Find(x=>x.type == prefab.type);
@@ -210,6 +195,7 @@ public class GameManager : MonoBehaviour, IGameManager
 
 	public void PerformWrongTouch (Defs.Side side)
 	{
+		Debug.Log("PerformWrongTouch " + side.ToString());
 		var movers = GetMovers(side);
 		var prefab = GetActualMoverShape(side);
 
@@ -249,8 +235,10 @@ public class GameManager : MonoBehaviour, IGameManager
 		float step = (int)side * -1 * World.BattleConfig.PositiveMove;
 		GenerateMoverShape(side);
 
-		if (battleMode != BattleMode.BeatMeRecording)
+		if (battleMode != BattleMode.BeatMeRecording) {
 			MoveLineByStep(step);
+			Debug.Log("ApplyRightTouch " + side + " step " + step);
+		}
 	}
 
 	void ApplyWrongTouch(Defs.Side side, Mover mover)
@@ -259,8 +247,10 @@ public class GameManager : MonoBehaviour, IGameManager
 		float step = (int)side * World.BattleConfig.NegativeMove;
 		GenerateMoverShape(side);
 
-		if (battleMode != BattleMode.BeatMeRecording)
+		if (battleMode != BattleMode.BeatMeRecording) {
 			MoveLineByStep(step);
+			Debug.Log("ApplyWrongTouch " + side + " step " + step);
+		}
 	}
 
 	public void OnTouch(Vector3 pos, Defs.Side side)
@@ -321,23 +311,12 @@ public class GameManager : MonoBehaviour, IGameManager
 	void OnMoveLineUpdate()
 	{
 		if (linePosition <= visual.GetLeftWinLinePosition()) {
-			ResolveBattleEnd();
+			BattleEnd();
 		}
 		else if (linePosition >= visual.GetRightWinLinePosition()) {
-			ResolveBattleEnd();
+			BattleEnd();
 		}
 	}
-
-	float GetHPCoef()
-	{
-		float rightPos = visual.GetRightWinLinePosition();
-		float leftPos = visual.GetLeftWinLinePosition();
-
-		float max = Mathf.Abs(rightPos - leftPos);
-		float curr = visual.GetLinePosition() - leftPos;
-		return curr / max;
-	}
-
 
 	void GenerateMoverShape(Defs.Side side)
 	{
@@ -352,7 +331,6 @@ public class GameManager : MonoBehaviour, IGameManager
 		moverShape.transform.SetParent(GetShapeContainer(side));
 		moverShape.transform.localPosition = Vector3.zero;
 		moverShape.PlayOut();
-		//moverShape.SetColor(Color.black);
 
 		SetActualMoverShape(moverShape, side);
 
@@ -360,12 +338,12 @@ public class GameManager : MonoBehaviour, IGameManager
 			ShapeChanged(side);
 	}
 
-	void ResolveBattleEnd(int forcedWinSide = 0)
+	void BattleEnd(int forcedWinSide = 0)
 	{
 		if (running) {
 			audio.Stop();
-
-
+			running = false;
+		
 			if (battleMode == BattleMode.BeatMeRecording) {
 				Menu.Instance.OpenInputTextPopup("Type name of your beat me battle",(str)=>{
 					var rec = new BattleRecord()	;
@@ -377,28 +355,9 @@ public class GameManager : MonoBehaviour, IGameManager
 					Session.Instance.Actions.CreateBeatMe(rec);
 				});
 			} else {
-				Defs.Side winningSide = visual.GetLinePosition() < 0 ?
-					Defs.Side.Right :Defs.Side.Left;
-
-				if (forcedWinSide != 0)
-					winningSide = forcedWinSide == -1 ? Defs.Side.Left : Defs.Side.Right;
-
-				// Right player won
-				if (winningSide == Defs.Side.Right)
-					ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_RIGHT_PLAYER_WON), true);
-				// Left Player won
-				else
-					ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_LEFT_PLAYER_WON), true);
-
-				if (battleMode == BattleMode.Solo && winningSide == GetPlayerSide()) {
-					ProgressManager.Instance.SaveLastFinishedMission(missionId);
-					Session.Instance.User.Profile.FinishedMission = missionId;
-					Session.Instance.Actions.UpdateUser();
-				}
+				StartCoroutine(DoBattleResolveAfter(1.0f, forcedWinSide));
 			}
-
-			running = false;
-			Invoke("Wait", 2.0f);
+			StartCoroutine(Wait());
 		}
 		ui.SetTimerActive(false);
 	}
@@ -408,8 +367,41 @@ public class GameManager : MonoBehaviour, IGameManager
 		return ai != null ? GameUtils.GetOppositeSide (ai.Side) : Defs.Side.Right;
 	}
 
-	void Wait()
+	IEnumerator DoBattleResolveAfter(float delay, int forcedWinSide = 0)
 	{
+		yield return new WaitForSeconds(delay);
+
+
+		Defs.Side winningSide = visual.GetLinePosition() < 0 ?
+			Defs.Side.Right :Defs.Side.Left;
+
+		if (forcedWinSide != 0)
+			winningSide = forcedWinSide == -1 ? Defs.Side.Left : Defs.Side.Right;
+
+		// Right player won
+		if (winningSide == Defs.Side.Right)
+			ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_RIGHT_PLAYER_WON), true);
+		// Left Player won
+		else
+			ui.ShowMessage(TextManager.Instance.Get(TextConts.STR_LEFT_PLAYER_WON), true);
+
+		if (battleMode == BattleMode.Solo && winningSide == GetPlayerSide()) {
+			ProgressManager.Instance.SaveLastFinishedMission(missionId);
+			Session.Instance.User.Profile.FinishedMission = missionId;
+			Session.Instance.Actions.UpdateUser();
+		}
+	}
+
+	IEnumerator Wait()
+	{
+		bool dropped = false;
+
+		DropConnection(()=>dropped = true);
+
+		yield return new WaitUntil(()=>dropped);
+
+		yield return new WaitForSeconds(3.0f);
+
 		App.Restart();
 	}
 
@@ -422,6 +414,7 @@ public class GameManager : MonoBehaviour, IGameManager
 
 
 		battleMode = BattleMode.Duel;
+		Menu.Instance.HideInGameMenu();
 		ui.SetToBattleGameMode();
 		StartCoroutine(CountDownCoroutine());
 	}
@@ -431,6 +424,7 @@ public class GameManager : MonoBehaviour, IGameManager
 		InputManagers =  new List<InputManager> { CreateInputManager(Defs.Side.Right) };
 		battleMode = BattleMode.BeatMeRecording;
 		ui.SetToBattleGameMode();
+		Menu.Instance.HideInGameMenu();
 		StartCoroutine(CountDownCoroutine());
 	}
 
@@ -439,15 +433,24 @@ public class GameManager : MonoBehaviour, IGameManager
 		InputManagers =  new List<InputManager> { CreateInputManager(Defs.Side.Right) };
 		battleMode = BattleMode.BeatMe;
 		ui.SetToBattleGameMode();
+		Menu.Instance.HideInGameMenu();
+
 		gameObject.AddComponent<BeatMeComponent>().Set(BattleRec);
 		StartCoroutine(CountDownCoroutine());
 	}
 
 	public void NewMultiGame()
 	{
+		Menu.Instance.CloseAllPopups();
+
 		battleMode = BattleMode.Multiplayer;
 		ui.SetToBattleGameMode();
+		Menu.Instance.HideInGameMenu();
+
 		StartCoroutine(CountDownCoroutine());
+
+		var side = InputManagers.Find(x=>x.isLocalPlayer).Side;
+		ui.ShowYourSide(side, true);
 	}
 
 
@@ -456,7 +459,7 @@ public class GameManager : MonoBehaviour, IGameManager
 		InputManagers =  new List<InputManager> { CreateInputManager(Defs.Side.Right) };
 		battleMode = BattleMode.Solo;
 		ui.SetToBattleGameMode();
-
+		Menu.Instance.HideInGameMenu();
 		int lastFinishedMission = ProgressManager.Instance.GetLastFinishedMission();
 		int nextMission = Mathf.Min(lastFinishedMission + 1, Session.Instance.Data.Utils.GetMissionsCount() - 1);
 		AiSettings aiSettings = Session.Instance.Data.Utils.GetAiSettings(nextMission);
@@ -466,6 +469,9 @@ public class GameManager : MonoBehaviour, IGameManager
 		ai = new GameObject("Ai").AddComponent<Ai>();
 		ai.Set(new AiContext(GetMovers, GetActualMoverShape, Defs.Side.Left, OnTouch, aiSettings));
 		ShapeChanged += ai.OnShapeChanged;
+
+		ui.ShowYourSide(InputManagers[0].Side, true);
+
 		StartCoroutine(CountDownCoroutine());
 	}
 
@@ -508,15 +514,6 @@ public class GameManager : MonoBehaviour, IGameManager
 		rightBattleRecorder = new BattleRecorder();
 	}
 
-	float GetLeftSidePosition()
-	{
-		return visual.GetLeftWinLinePosition();
-	}
-
-	float GetRightSidePosition()
-	{
-		return visual.GetRightWinLinePosition();
-	}
 
 	void BonusOutOfScreen(BonusBase bonus)
 	{
@@ -534,24 +531,6 @@ public class GameManager : MonoBehaviour, IGameManager
 		GetBattleRecorder(side).AddEvent(BattleEventType.NumbersLost, battleTime);
 	}
 
-	void OnBonusPicked(BonusBase bonusBase)
-	{
-		if (bonusBase is BonusShuffle) {
-			SwapMovers(GameUtils.GetOppositeSide(bonusBase.Side));
-			GetBattleRecorder(bonusBase.Side).AddEvent(BattleEventType.Shuffle, battleTime);
-		} else if (bonusBase is BonusNumber) {
-			Transform bonusContainer = GetBonusContainer(bonusBase.Side);
-			if (bonusBase.Falling) {
-				var pos = bonusContainer.position - (int)bonusBase.Side * bonusContainer.childCount * new Vector3(1.05f, 0,0);
-				bonusBase.transform.SetParent(bonusContainer);
-				bonusBase.transform.position = pos;
-				GetBattleRecorder(bonusBase.Side).AddEvent(BattleEventType.NumberTapped, battleTime);
-			} else {
-				StartCoroutine(PickNumberBonus(bonusContainer, GetBonusGenerator(bonusBase.Side), bonusBase.Side));
-			}
-		}
-	}
-		
 	IEnumerator PickNumberBonus(Transform container, BonusGenerator generator, Defs.Side side)
 	{
 		GetBattleRecorder(side).AddEvent(BattleEventType.NumbersFired, battleTime);
@@ -579,51 +558,42 @@ public class GameManager : MonoBehaviour, IGameManager
 		return inputManager;
 	}
 
-
-
-	public void OnReset()
+	public void JoinBattle(MatchInfoSnapshot match)
 	{
-		Menu.Instance.OpenQuestionPopup ("", TextManager.Instance.Get (TextConts.STR_RESET_THE_GAME), 
-			// yes
-			()=> {
-				ProgressManager.Instance.ResetProgress();
-				App.Restart();
-			},
-			//no
-			() => {}
+		Menu.Instance.ShowLoadingCircle(true);
+		networkManager.matchMaker.JoinMatch(match.networkId, "", "","", 0, 0, 
+			(succ, info, matchInfo)=> {
+				if (succ) {
+					networkManager.StartClient(matchInfo);
+					currentMatchInfo = matchInfo;
+				} else {
+					Menu.Instance.OpenInfoPopup("Error", "JoinMatch " + info, null);
+				}
+				//Menu.Instance.ShowLoadingCircle(false);
+			}
 		);
 	}
 
-	public void OnConnect()
+	public void DropConnection(Action action)
 	{
-		Menu.Instance.OpenInputTextPopup (
-			TextManager.Instance.Get (TextConts.STR_TYPE_NAME), (str)=> {
-				Session.Instance.User.SetName(str, (result)=> {
-					ui.Refresh();
+		if (currentMatchInfo != null) {
+				networkManager.matchMaker.DropConnection(
+				currentMatchInfo.networkId, 
+				currentMatchInfo.nodeId, 
+				0,
+				(success, extendedInfo) => 
+				{
+					currentMatchInfo = null;
+					Debug.Log("DropConnection finished");
+					action ();
+				
+					networkManager.StopClient();
+					networkManager.StopHost();
+					networkManager.StopMatchMaker();
 				});
-			});
-	}
-
-	public void OnLbs()
-	{
-		ActivityIndicator.Show();
-		Session.Instance.Actions.GetLeaderboards((lb)=>{
-			Menu.Instance.OpenLBPopup(lb);
-			ActivityIndicator.Hide();
-		});
-	}
-
-	public void OnBeatMe()
-	{
-		ActivityIndicator.Show();
-		Session.Instance.Actions.GetBeatMe((recs)=>{
-			Menu.Instance.OpenBeatMePopup(recs);
-			ActivityIndicator.Hide();
-		});
-	}
-
-	public void OnLobby()
-	{
-		SceneManager.LoadScene("Lobby");
+		}
+		else { 
+			action();
+		}
 	}
 }

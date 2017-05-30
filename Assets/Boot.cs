@@ -26,6 +26,10 @@ public class Boot : MonoBehaviour
 		yield return new WaitUntil(()=>profileFinished);
 
 		SceneManager.LoadScene(1, LoadSceneMode.Additive);
+		yield return 0; // SceneManager.LoadScenehas delay 1 frame
+		Menu.Instance.ShowInGameMenu();
+
 		yield return StartCoroutine(Menu.Instance.SetIntroPanelActive(false));
+	
 	}
 }

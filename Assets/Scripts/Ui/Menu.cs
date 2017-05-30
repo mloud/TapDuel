@@ -4,6 +4,7 @@ using System.Collections;
 using Vis;
 using System.Collections.Generic;
 using Data;
+using UnityEngine.Networking.Match;
 
 
 public class Menu : MonoBehaviour
@@ -12,10 +13,10 @@ public class Menu : MonoBehaviour
 	GameObject infoPopupPrefab;
 
 	[SerializeField]
-	GameObject questionPopupPrefab;
+	GameObject infoPanelPrefab;
 
 	[SerializeField]
-	GameObject ingameUiPrefab;
+	GameObject questionPopupPrefab;
 
 	[SerializeField]
 	GameObject inputNamePrefab;
@@ -26,9 +27,20 @@ public class Menu : MonoBehaviour
 	[SerializeField]
 	GameObject beatMePopupPrefab;
 
+	[SerializeField]
+	GameObject matchesPopupPrefab;
+
+	[SerializeField]
+	GameObject createMatchPopupPrefab;
+
+	[SerializeField]
+	GameObject loadingCircle;
 
 	[SerializeField]
 	GameObject introPanel;
+
+	[SerializeField]
+	InGameMenu ingameMenu;
 
 	public static Menu Instance {
 		get {return instance; }
@@ -41,18 +53,43 @@ public class Menu : MonoBehaviour
 		DontDestroyOnLoad(gameObject);
 	}
 
+	public void ShowLoadingCircle(bool show)
+	{
+		loadingCircle.SetActive(show);
+	}
+
+	public void CloseAllPopups()
+	{
+		for (int i = 3; i < transform.childCount; ++i) {
+			GameObject.Destroy(transform.GetChild(i).gameObject);
+		}
+		ShowLoadingCircle(false);
+	}
 	public IEnumerator SetIntroPanelActive(bool active)
 	{
 		if (!active) {
 			float alpha = 1.0f;
 			while (alpha > 0){
-				Vis.Utils.SetAlpha(alpha, introPanel);
+				Utils.SetAlpha(alpha, introPanel);
 				alpha = Mathf.Max(0, alpha - 0.05f);
 				yield return 0;
 			}
 		}
 		introPanel.SetActive(active);
 	}
+
+	public void OpenInfoPanel(string title)
+	{
+		var popupGo = Instantiate(infoPanelPrefab);	
+		popupGo.transform.SetParent(transform);
+		popupGo.transform.localPosition = Vector3.zero;
+		(popupGo.transform as RectTransform).offsetMax = Vector2.zero;
+		(popupGo.transform as RectTransform).offsetMin = Vector2.zero;
+		var panel = popupGo.GetComponent<InfoPanel>();
+		popupGo.transform.SetAsLastSibling();
+		panel.Open(title);
+	}
+
 
 	public void OpenInfoPopup(string title,string text, Action action)
 	{
@@ -76,21 +113,26 @@ public class Menu : MonoBehaviour
 		popup.Init(title, action,null);
 	}
 
-	public void ShowInGameUi()
+	public void OpenCreateMatchPopup(Action<string> action, Action back)
 	{
-		var ingameUi = Instantiate(ingameUiPrefab);	
+		var popupGo = Instantiate(createMatchPopupPrefab);	
 
-		ingameUi.transform.SetParent(transform);
-		ingameUi.transform.SetAsFirstSibling();
-		ingameUi.transform.localPosition = Vector3.zero;
-		Utils.Makefullscreen(ingameUi.transform);
-		//var ui = ingameUi.GetComponent<InGameMenu>();
+		popupGo.transform.SetParent(transform);
+		popupGo.transform.SetAsLastSibling();
+		popupGo.transform.localPosition = Vector3.zero;
+		var popup = popupGo.GetComponent<MatchMakingCreatePopup>();
+		popup.Init(action,back);
 	}
 
-	public void HideIngameUi()
+	public void ShowInGameMenu()
 	{
-		var ingameUi = gameObject.GetComponentInChildren<InGameMenuOverlay>();
-		Destroy(ingameUi.gameObject);
+		ingameMenu.Init();
+		ingameMenu.gameObject.SetActive(true);
+	}
+
+	public void HideInGameMenu()
+	{
+		ingameMenu.gameObject.SetActive(false);
 	}
 
 	public void OpenQuestionPopup(string title,string text, Action actionYes, Action actionNo)
@@ -125,6 +167,24 @@ public class Menu : MonoBehaviour
 		var popup = popupGo.GetComponent<BeatMePopup>();
 		popup.Init(recs);
 	}
+
+	public void OpenMatchesPopup(List<MatchInfoSnapshot> recs)
+	{
+		var popupGo = Instantiate(matchesPopupPrefab);	
+
+		popupGo.transform.SetParent(transform);
+		popupGo.transform.SetAsLastSibling();
+		popupGo.transform.localPosition = Vector3.zero;
+		var popup = popupGo.GetComponent<MatchesPopup>();
+		popup.Init(recs);
+	}
+
+
+	void OnShareButton()
+	{
+		App.InviteToGame();
+	}
+
 }
 
 

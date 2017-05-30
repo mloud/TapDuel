@@ -29,10 +29,7 @@ public class InputManager : NetworkBehaviour
 				var side = GetSide(Input.mousePosition.x);
 				if (side == Side) {			
 					var wPos = ScreenToWorldPoint(Input.touches[i].position);
-					if (UsedInMultiplayer)
-						CmdTouch(wPos, side);
-					else
-						Touch(wPos, side);
+					Touch(wPos, side);
 				}
 			}
 		}
@@ -64,9 +61,9 @@ public class InputManager : NetworkBehaviour
 	[ClientRpc]
 	void RpcClientTouch(Vector3 pos, Defs.Side side)
 	{
-		//if (isLocalPlayer) {
-		gameManager.OnTouch(pos, side);
-		//}
+		if (isLocalPlayer) {
+			gameManager.OnTouch(pos, side);
+		}
 	}
 
 	[Command]

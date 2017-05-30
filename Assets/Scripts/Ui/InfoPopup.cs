@@ -11,14 +11,21 @@ public class InfoPopup : MonoBehaviour
 	[SerializeField]
 	TextMeshProUGUI text;
 
+	[SerializeField]
+	TextMeshProUGUI buttonText;
+
 
 	[SerializeField]
 	UnityEngine.UI.Button button;
 
-	public void Init(string title, string message, Action action)
+	public void Init(string title, string message, Action action, string buttonName = null)
 	{
 		this.text.text = message;
 		this.title.text = title;
+		if (!string.IsNullOrEmpty(buttonName)) {
+			buttonText.text = buttonName;
+		}
+
 		button.onClick.AddListener(()=> {
 			if (action != null)
 				action();

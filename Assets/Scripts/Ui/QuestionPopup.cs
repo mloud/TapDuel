@@ -2,7 +2,7 @@
 using TMPro;
 using UnityEngine;
 
-public class QuestionPopup : MonoBehaviour
+public class QuestionPopup : Popup
 {
 	[SerializeField]
 	TextMeshProUGUI title;
@@ -30,7 +30,7 @@ public class QuestionPopup : MonoBehaviour
 		noBtn.onClick.AddListener(()=> {
 			if (actionNo != null)
 				actionNo();
-			Destroy(gameObject);
+			Close();
 		});
 	}
 }

@@ -1,15 +1,19 @@
 ﻿using UnityEngine;
 using System;
 using System.Linq;
+using UnityEngine.Networking;
 
 public class MultiplayerComponent : MonoBehaviour
 {
 	IGameManager gameManager;
+	NetworkManager networkManager;
+
 	bool checkForMultiPlayers = true;
 	float timer;
 	void Awake()
 	{
 		gameManager = Array.Find(GetComponents<MonoBehaviour>(),x => x is IGameManager) as IGameManager;
+		networkManager = GameObject.FindObjectOfType<NetworkManager>();
 		gameManager.RightTouchAction += RightTouchAction;
 		gameManager.WrongTouchAction += WrongTouchAction;
 		gameManager.BonusCollectedAction += CollectBonus;
@@ -68,7 +72,7 @@ public class MultiplayerComponent : MonoBehaviour
 				checkForMultiPlayers = false;
 				gameManager.NewMultiGame();
 			}
-			timer = Time.time + 1.0f;
+			timer = Time.time;
 		}
 	}
 

@@ -16,14 +16,6 @@ public class Ui : MonoBehaviour
 	[SerializeField]
 	SpriteRenderer background;
 
-	[SerializeField]
-	GameObject playButton;
-
-	[SerializeField]
-	GameObject playAiButton;
-
-	[SerializeField]
-	GameObject resetButton;
 
 	[SerializeField]
 	GameObject connectButton;
@@ -42,13 +34,17 @@ public class Ui : MonoBehaviour
 	TextMeshPro progressTxt;
 
 	[SerializeField]
-	TextMeshPro gameTitle;
-
-	[SerializeField]
 	TextMeshPro userText;
 
 	[SerializeField]
 	GameObject centerLine;
+
+	[SerializeField]
+	TextMeshPro leftYourSide;
+
+	[SerializeField]
+	TextMeshPro rightYourSide;
+
 
 	void Awake()
 	{
@@ -58,13 +54,7 @@ public class Ui : MonoBehaviour
 
 	public void SetToBattleGameMode()
 	{
-		SetPlayButtonActive(false);
-		resetButton.SetActive(false);
-		connectButton.SetActive(false);
-		lbButton.SetActive(false);
-		beatMeListButton.SetActive(false);
 		centerLine.SetActive(true);
-		gameTitle.gameObject.SetActive(false);
 	}
 
 	public void Refresh()
@@ -78,7 +68,7 @@ public class Ui : MonoBehaviour
 
 	void SetProgress(int actualMission, int totalMission)
 	{
-		progressTxt.text = string.Format("{0}/{1}", actualMission, totalMission);
+		//progressTxt.text = string.Format("{0}/{1}", actualMission, totalMission);
 	}
 
 
@@ -121,10 +111,19 @@ public class Ui : MonoBehaviour
 		}
 	}
 
+	public void ShowYourSide(Defs.Side side, bool visible)
+	{
+		if (side == Defs.Side.Left) {
+			rightYourSide.gameObject.SetActive(false);
+			leftYourSide.gameObject.SetActive(visible);
+		} else {
+			leftYourSide.gameObject.SetActive(false);
+			rightYourSide.gameObject.SetActive(visible);
+		}
+	}
+
 	void SetPlayButtonActive(bool active)
 	{
-		playButton.SetActive(active);
-		playAiButton.SetActive(active);
 		beatMeButton.SetActive(active);
 	}
 }
