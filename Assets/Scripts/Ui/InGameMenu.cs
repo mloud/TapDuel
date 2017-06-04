@@ -1,60 +1,115 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
+using TMPro;
+using Txt;
+using UnityEngine.UI;
 
 public class InGameMenu : MonoBehaviour
 {
-	[SerializeField]
-	UnityEngine.UI.Button duelButton;
+    [SerializeField]
+    UnityEngine.UI.Button duelButton;
+
+    [SerializeField]
+    UnityEngine.UI.Button soloButton;
+
+    [SerializeField]
+    UnityEngine.UI.Button pvpButton;
+
+    [SerializeField]
+    UnityEngine.UI.Button lbButton;
+
+    [SerializeField]
+    UnityEngine.UI.Button shareButton;
+
+    [SerializeField]
+    UnityEngine.UI.Button resetButton;
+
+    [SerializeField]
+    UnityEngine.UI.Button fbButton;
 
 	[SerializeField]
-	UnityEngine.UI.Button soloButton;
+	UnityEngine.UI.Button multiplayerButton;
+
 
 	[SerializeField]
-	UnityEngine.UI.Button pvpButton;
+    Image profileImage;
 
-	[SerializeField]
-	UnityEngine.UI.Button lbButton;
+    [SerializeField]
+    TextMeshProUGUI profileName;
 
-	[SerializeField]
-	UnityEngine.UI.Button shareButton;
+    GameManager gameManager;
 
-	[SerializeField]
-	UnityEngine.UI.Button createPVPButton;
+    public void Init()
+    {
+        gameManager = FindObjectOfType<GameManager>();
 
-	[SerializeField]
-	UnityEngine.UI.Button joinPVPButton;
+        duelButton.onClick.RemoveAllListeners();
+        soloButton.onClick.RemoveAllListeners();
 
-	[SerializeField]
-	UnityEngine.UI.Button resetButton;
+        multiplayerButton.onClick.RemoveAllListeners();
+        lbButton.onClick.RemoveAllListeners();
+        resetButton.onClick.RemoveAllListeners();
+        shareButton.onClick.RemoveAllListeners();
 
+		duelButton.onClick.AddListener(() => StartCoroutine(GetGameManager().NewGame()));
+        soloButton.onClick.AddListener(() => GetGameManager().NewAiGame());
+		multiplayerButton.onClick.AddListener (OnMultiplayer);
+        resetButton.onClick.AddListener(() => GetGameManager().OnReset());
+        lbButton.onClick.AddListener(() => GetGameManager().OnLbs());
 
-	GameManager gameManager;
+        shareButton.onClick.AddListener(OnShare);
 
-	public void Init()
-	{
-		gameManager = GameObject.FindObjectOfType<GameManager>();
-
-		duelButton.onClick.RemoveAllListeners();
-		soloButton.onClick.RemoveAllListeners();
-		createPVPButton.onClick.RemoveAllListeners();
-		joinPVPButton.onClick.RemoveAllListeners();
-		lbButton.onClick.RemoveAllListeners();
-		resetButton.onClick.RemoveAllListeners();
-		shareButton.onClick.RemoveAllListeners();
-
-		duelButton.onClick.AddListener(()=>GetGameManager().NewGame());
-		soloButton.onClick.AddListener(()=>GetGameManager().NewAiGame());
-		createPVPButton.onClick.AddListener(()=>GetGameManager().OnCreateMatch());
-		joinPVPButton.onClick.AddListener(()=>GetGameManager().OnListBattles());
-		resetButton.onClick.AddListener(()=>GetGameManager().OnReset());
-		lbButton.onClick.AddListener(()=>GetGameManager().OnLbs());
-		shareButton.onClick.AddListener(()=>GetGameManager().OnShare());
-
+        App.Instance.FB.InitAction = OnFacebookLogginChanged;
+        App.Instance.FB.AuthAction = OnFacebookAuth;
+		App.Instance.FB.ProfilePictureChangedAction = OneProfilePictureChanged;
+        App.Instance.FB.ProfileNameChangedAction = OnProfileNameChanged;
 	}
 
-	GameManager GetGameManager()
-	{
-		return GameObject.FindObjectOfType<GameManager>();
-	}
+    GameManager GetGameManager()
+    {
+        return FindObjectOfType<GameManager>();
+    }
+
+    void OnFacebookAuth(bool loggedIn)
+    {
+		if (loggedIn) {
+    	    App.Instance.Menu.OpenInfoPopup("Facebook", App.Instance.Text.Get(TextConts.STR_LOGGED_TO_FACEBOOK), null);
+		} 
+        OnFacebookLogginChanged(loggedIn);
+    }
+
+    void OnFacebookLogginChanged(bool loggedIn)
+    {
+        var text = fbButton.GetComponentInChildren<TextMeshProUGUI>();
+        text.text = App.Instance.Text.Get(loggedIn ? TextConts.STR_CONNECTED : TextConts.STR_LOG_IN);
+
+        fbButton.onClick.RemoveAllListeners();
+        fbButton.onClick.AddListener(() => {
+            if (!loggedIn) {
+                App.Instance.FB.Login();
+            };
+        });
+    }
+
+    void OnProfileNameChanged(string userName)
+    {
+        profileName.text = userName;
+    }
+
+    void OneProfilePictureChanged(Texture2D texture)
+    {
+        profileImage.gameObject.SetActive(true);
+        profileImage.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+    }
+
+    void OnShare()
+    {
+        App.Instance.FB.InviteToApp();
+    }
+
+    void OnMultiplayer()
+    {
+        App.Instance.Menu.OpenCreateJoinPopup();
+    }
+
 }
 

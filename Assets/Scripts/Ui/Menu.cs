@@ -1,38 +1,10 @@
-﻿using UnityEngine;
-using System;
+﻿﻿using UnityEngine;
 using System.Collections;
 using Vis;
-using System.Collections.Generic;
-using Data;
-using UnityEngine.Networking.Match;
+using UnityEngine.UI;
 
-
-public class Menu : MonoBehaviour
+public partial class Menu : MonoBehaviour
 {
-	[SerializeField]
-	GameObject infoPopupPrefab;
-
-	[SerializeField]
-	GameObject infoPanelPrefab;
-
-	[SerializeField]
-	GameObject questionPopupPrefab;
-
-	[SerializeField]
-	GameObject inputNamePrefab;
-
-	[SerializeField]
-	GameObject lbPopupPrefab;
-
-	[SerializeField]
-	GameObject beatMePopupPrefab;
-
-	[SerializeField]
-	GameObject matchesPopupPrefab;
-
-	[SerializeField]
-	GameObject createMatchPopupPrefab;
-
 	[SerializeField]
 	GameObject loadingCircle;
 
@@ -42,15 +14,31 @@ public class Menu : MonoBehaviour
 	[SerializeField]
 	InGameMenu ingameMenu;
 
-	public static Menu Instance {
-		get {return instance; }
-	}
-	static Menu instance;
+	[SerializeField]
+	BattleMenu battleMenu;
+
+
+	[SerializeField]
+	Transform popupContainer;
+
+    GameManager GameManager { get {
+            if (gameManager == null)
+                gameManager = FindObjectOfType<GameManager>();
+            return gameManager;
+        }}
+
+    GameManager gameManager;
+   
+
 
 	void Awake()
 	{
-		instance = this;
 		DontDestroyOnLoad(gameObject);
+	}
+
+	public void Init()
+	{
+		ingameMenu.Init();
 	}
 
 	public void ShowLoadingCircle(bool show)
@@ -58,13 +46,48 @@ public class Menu : MonoBehaviour
 		loadingCircle.SetActive(show);
 	}
 
-	public void CloseAllPopups()
-	{
-		for (int i = 3; i < transform.childCount; ++i) {
-			GameObject.Destroy(transform.GetChild(i).gameObject);
-		}
-		ShowLoadingCircle(false);
+    public IEnumerator FadeToBlack()
+    {
+        var fadeGo = new GameObject("fade");
+		fadeGo.AddComponent<RectTransform>();
+        fadeGo.transform.SetParent(transform);
+        fadeGo.transform.SetAsLastSibling();
+		fadeGo.transform.localScale = Vector3.one;
+        fadeGo.transform.localPosition = Vector3.zero;
+        (fadeGo.transform as RectTransform).sizeDelta = new Vector2(Screen.width, Screen.height);
+        var image = fadeGo.AddComponent<Image>();
+
+        float startTime = Time.time;
+        const float duration = 0.2f;
+        while (true) {
+            float c = Mathf.Min(1, (Time.time - startTime) / duration);
+            image.color = new Color(0, 0, 0, c);
+            if (c >= 1) {
+                break;
+            }
+            yield return 0;
+        } 
 	}
+
+	public IEnumerator FadeToWhite()
+	{
+        var fadeGo = transform.Find("fade");
+        var image = fadeGo.GetComponent<Image>();
+
+		float startTime = Time.time;
+		const float duration = 0.2f;
+		while (true)
+		{
+			float c = 1 - Mathf.Min(1, (Time.time - startTime) / duration);
+			image.color = new Color(0, 0, 0, c);
+            if (c < Mathf.Epsilon) {
+				break;
+			}
+			yield return 0;
+		}
+		Destroy(fadeGo.gameObject);
+	}
+
 	public IEnumerator SetIntroPanelActive(bool active)
 	{
 		if (!active) {
@@ -77,114 +100,37 @@ public class Menu : MonoBehaviour
 		}
 		introPanel.SetActive(active);
 	}
-
-	public void OpenInfoPanel(string title)
-	{
-		var popupGo = Instantiate(infoPanelPrefab);	
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.localPosition = Vector3.zero;
-		(popupGo.transform as RectTransform).offsetMax = Vector2.zero;
-		(popupGo.transform as RectTransform).offsetMin = Vector2.zero;
-		var panel = popupGo.GetComponent<InfoPanel>();
-		popupGo.transform.SetAsLastSibling();
-		panel.Open(title);
-	}
-
-
-	public void OpenInfoPopup(string title,string text, Action action)
-	{
-		var popupGo = Instantiate(infoPopupPrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<InfoPopup>();
-		popup.Init(title, text, action);
-	}
-
-	public void OpenInputTextPopup(string title, Action<string> action)
-	{
-		var popupGo = Instantiate(inputNamePrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<InputFieldPopup>();
-		popup.Init(title, action,null);
-	}
-
-	public void OpenCreateMatchPopup(Action<string> action, Action back)
-	{
-		var popupGo = Instantiate(createMatchPopupPrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<MatchMakingCreatePopup>();
-		popup.Init(action,back);
-	}
-
+   
 	public void ShowInGameMenu()
 	{
 		ingameMenu.Init();
 		ingameMenu.gameObject.SetActive(true);
+		battleMenu.gameObject.SetActive(false);
 	}
 
 	public void HideInGameMenu()
 	{
 		ingameMenu.gameObject.SetActive(false);
+		battleMenu.gameObject.SetActive(true);
 	}
 
-	public void OpenQuestionPopup(string title,string text, Action actionYes, Action actionNo)
-	{
-		var popupGo = Instantiate(questionPopupPrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<QuestionPopup>();
-		popup.Init(title, text, actionYes, actionNo);
+    void OnCreateBattle()
+    {
+		App.Instance.Menu.OpenCreateMatchPopup(GameManager.StartMultiplayerMatch, null);
 	}
 
-	public void OpenLBPopup(List<PlayerRecord> lb)
-	{
-		var popupGo = Instantiate(lbPopupPrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<LBPopup>();
-		popup.Init(lb);
-	}
-
-	public void OpenBeatMePopup(List<BattleRecord> recs)
-	{
-		var popupGo = Instantiate(beatMePopupPrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<BeatMePopup>();
-		popup.Init(recs);
-	}
-
-	public void OpenMatchesPopup(List<MatchInfoSnapshot> recs)
-	{
-		var popupGo = Instantiate(matchesPopupPrefab);	
-
-		popupGo.transform.SetParent(transform);
-		popupGo.transform.SetAsLastSibling();
-		popupGo.transform.localPosition = Vector3.zero;
-		var popup = popupGo.GetComponent<MatchesPopup>();
-		popup.Init(recs);
-	}
-
-
-	void OnShareButton()
-	{
-		App.InviteToGame();
-	}
-
+    void OnJoinBattle()
+    {
+        App.Instance.Menu.ShowLoadingCircle(true);
+        GameManager.ListBattles((succ, info, matches) => {
+            if (succ) {
+                App.Instance.Menu.OpenMatchesPopup(matches);
+            } else {
+                App.Instance.Menu.OpenInfoPopup("Error", "ListMatches " + info, null);
+            }
+            App.Instance.Menu.ShowLoadingCircle(false);
+        });
+    }
 }
 
 
